@@ -15,6 +15,9 @@ A complete deep learning–based smart energy monitoring platform built on the U
 📊 Streamlit Dashboard
 
 🏗 System Architecture
+              ## 🏗 System Architecture
+
+```text
                 ┌──────────────────────┐
                 │   UK-DALE Dataset    │
                 │   (6-sec sampling)   │
@@ -40,7 +43,10 @@ A complete deep learning–based smart energy monitoring platform built on the U
                 FastAPI Backend
                         ▼
                 Streamlit Dashboard
-📂 Project Structure
+```
+## 📂 Project Structure
+
+```bash
 IntelliWatt/
 │
 ├── data/
@@ -63,6 +69,7 @@ IntelliWatt/
 ├── saved_models/
 │
 └── requirements.txt
+```
 🔬 Core Models
 🔌 1. NILM – Seq-to-Point CNN
 
