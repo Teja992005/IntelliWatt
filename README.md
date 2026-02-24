@@ -11,8 +11,7 @@ A complete deep learning–based smart energy monitoring platform built on the *
 
 ---
 
-````markdown
-## 🏗 System Architecture (Mermaid Diagram)
+## 🏗 System Architecture
 
 ```mermaid
 flowchart TD
@@ -53,9 +52,10 @@ flowchart TD
     F --> H
 
     H --> I
----
 ```
-````
+
+---
+
 ## 📂 Project Structure
 
 ```bash
@@ -92,7 +92,7 @@ IntelliWatt/
 - Window size: **599**
 - Sampling rate: **6 seconds**
 - Center-point prediction
-- Individual models for:
+- Individual models:
   - fridge
   - kettle
   - microwave
@@ -201,11 +201,11 @@ uvicorn backend.app:app --reload
 
 Features:
 
-- Real-time power graph
-- Appliance-level breakdown
-- Forecast visualization
-- Monthly bill estimate
-- Anomaly alerts (color-coded severity)
+- Real-time power graph  
+- Appliance-level breakdown  
+- Forecast visualization  
+- Monthly bill estimate  
+- Anomaly alerts (color-coded severity)  
 
 Run frontend:
 
