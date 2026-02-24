@@ -16,21 +16,21 @@ A complete deep learning–based smart energy monitoring platform built on the *
 ```mermaid
 flowchart TD
 
-    A[UK-DALE Dataset<br/>6-sec Sampling]
-    B[Preprocessing<br/>Resampling • Scaling • Windowing]
+    A[UK-DALE Dataset 6-sec Sampling]
+    B[Preprocessing Resampling Scaling Windowing]
 
-    C1[NILM Model<br/>Seq-to-Point CNN]
-    C2[Forecasting Model<br/>LSTM (1-step)]
-    C3[Anomaly Model<br/>LSTM Autoencoder]
+    C1[NILM Model Seq-to-Point CNN]
+    C2[Forecasting Model LSTM]
+    C3[Anomaly Model LSTM Autoencoder]
 
-    D1[Appliance-Level Power]
+    D1[Appliance Level Power]
     D2[Future Load Prediction]
     D3[Reconstruction Error]
 
     E[3000W Safety Rule]
-    F[Severity Engine<br/>Normal • Mild • Severe]
+    F[Severity Engine]
 
-    G[Bill Estimation<br/>₹6 per kWh]
+    G[Bill Estimation Rs6 per kWh]
     H[FastAPI Backend]
     I[Streamlit Dashboard]
 
