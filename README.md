@@ -11,36 +11,48 @@ A complete deep learning–based smart energy monitoring platform built on the *
 
 ---
 
-## 🏗 System Architecture
+````markdown
+## 🏗 System Architecture (Mermaid Diagram)
 
-```text
-                ┌──────────────────────┐
-                │   UK-DALE Dataset    │
-                │   (6-sec sampling)   │
-                └──────────┬───────────┘
-                           ▼
-                ┌──────────────────────┐
-                │   Preprocessing      │
-                │ - Resampling         │
-                │ - Scaling            │
-                │ - Windowing          │
-                └──────────┬───────────┘
-                           ▼
-        ┌─────────────── Parallel AI Inference ───────────────┐
-        ▼                       ▼                            ▼
-   NILM (CNN)            Forecast (LSTM)           Anomaly (AE + Rule)
-        ▼                       ▼                            ▼
- Appliance Power        Future Load (t+1)      Reconstruction Error
-                                                    + 3000W Rule
-        └───────────────┬────────────────────────────┬───────────────┘
-                        ▼                            ▼
-               Bill Estimation                Severity Engine
-                        ▼
-                FastAPI Backend
-                        ▼
-                Streamlit Dashboard
-```
+```mermaid
+flowchart TD
 
+    A[UK-DALE Dataset<br/>6-sec Sampling]
+    B[Preprocessing<br/>Resampling • Scaling • Windowing]
+
+    C1[NILM Model<br/>Seq-to-Point CNN]
+    C2[Forecasting Model<br/>LSTM (1-step)]
+    C3[Anomaly Model<br/>LSTM Autoencoder]
+
+    D1[Appliance-Level Power]
+    D2[Future Load Prediction]
+    D3[Reconstruction Error]
+
+    E[3000W Safety Rule]
+    F[Severity Engine<br/>Normal • Mild • Severe]
+
+    G[Bill Estimation<br/>₹6 per kWh]
+    H[FastAPI Backend]
+    I[Streamlit Dashboard]
+
+    A --> B
+    B --> C1
+    B --> C2
+    B --> C3
+
+    C1 --> D1
+    C2 --> D2
+    C3 --> D3
+
+    D3 --> F
+    E --> F
+
+    D2 --> G
+    G --> H
+    D1 --> H
+    F --> H
+
+    H --> I
 ---
 
 ## 📂 Project Structure
