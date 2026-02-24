@@ -1,0 +1,7 @@
+{
+    "appliance": "microwave",
+    "mae_watts": 192.941,
+    "rmse_watts": 362.895,
+    "evaluated_at": "2026-02-23 08:55:24",
+    "f1_score": 0.89
+}

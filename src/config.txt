@@ -1,0 +1,10 @@
+APPLIANCE_MAPPING = {
+    "kettle": 10,
+    "washing_machine": 6,
+    "fridge": 9,
+    "microwave": 13
+}
+
+WINDOW_SIZE = 599        # or your current window size
+SAMPLING_RATE = 6        # seconds
+BUILDING = 1

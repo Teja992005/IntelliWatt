@@ -1,0 +1,7 @@
+{
+    "model": "mains_anomaly_lstm",
+    "window_size": 60,
+    "threshold": 0.47230207920074463,
+    "mean_error": 0.05622164160013199,
+    "std_error": 0.20804022252559662
+}

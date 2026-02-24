@@ -1,0 +1,7 @@
+{
+    "appliance": "fridge",
+    "mae_watts": 5.973,
+    "rmse_watts": 10.827,
+    "evaluated_at": "2026-02-24 10:37:19",
+    "f1_score": 0.864
+}

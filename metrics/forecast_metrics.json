@@ -1,0 +1,6 @@
+{
+    "model": "mains_forecast",
+    "window_size": 60,
+    "mae": 26.613658905029297,
+    "rmse": 139.65539340193774
+}

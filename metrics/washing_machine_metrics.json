@@ -1,0 +1,7 @@
+{
+    "appliance": "washing_machine",
+    "mae_watts": 223.944,
+    "rmse_watts": 472.867,
+    "evaluated_at": "2026-02-23 10:09:45",
+    "f1_score": 0.939
+}

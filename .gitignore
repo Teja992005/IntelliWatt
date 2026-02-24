@@ -1,0 +1,14 @@
+venv/
+__pycache__/
+backend/__pycache__/
+data/processed/*npy
+*.pyc
+.ipynb_checkpoints/
+src/models/*.h5
+data/ukdale/
+data/samples/
+src/__pycache__/
+src/evaluation/__pycache__/
+src/models/__pycache__/
+src/preprocessing/__pycache__/
+.env
