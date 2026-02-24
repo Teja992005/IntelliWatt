@@ -117,12 +117,13 @@ Threshold:
 threshold = mean_error + 2 * std_error
 
 Current metrics:
-
+```
 {
     "threshold": 0.4723,
     "mean_error": 0.0562,
     "std_error": 0.2080
 }
+```
 Safety Rule
 if total_power > 3000:
     severity = "severe"
