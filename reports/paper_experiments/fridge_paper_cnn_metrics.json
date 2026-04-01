@@ -1,0 +1,10 @@
+{
+    "model": "Paper_CNN",
+    "appliance": "Fridge",
+    "sampling": "1_minute",
+    "input_length": 510,
+    "epochs": 30,
+    "mae": 25.400243759155273,
+    "rmse": 32.70377821253991,
+    "training_time_seconds": 38.846884965896606
+}

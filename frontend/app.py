@@ -8,22 +8,22 @@ st.title("⚡ IntelliWatt Dashboard")
 st.subheader("AI-Based Energy Analytics System")
 
 BACKEND_URL = "http://127.0.0.1:8000"
-WINDOW_SIZE = 599  # 🔥 Must match backend & training
+WINDOW_SIZE = 599
 
 # ==================================================
 # NILM SECTION
 # ==================================================
+
 st.markdown(f"""
 ### 🔌 Appliance Energy Disaggregation (NILM)
 
 1. Select an appliance  
-2. Enter **exactly {WINDOW_SIZE} aggregated mains power values** (comma-separated)
+2. Enter **exactly {WINDOW_SIZE} aggregated mains power values**
 
 📌 Sample rate: 6 seconds  
-📌 599 readings ≈ 1 hour of aggregate data  
+📌 599 readings ≈ 1 hour  
 
-🔮 The model predicts the appliance power at the **center of that 1-hour window**
-(approximately 30 minutes into the input sequence).
+The model predicts the appliance power at the **center of the window**.
 """)
 
 appliance = st.selectbox(
@@ -42,334 +42,334 @@ if st.button("Predict Appliance Power"):
         st.error("Please enter power values.")
     else:
         try:
+
             data = [float(x.strip()) for x in power_input.split(",")]
 
             if len(data) != WINDOW_SIZE:
                 st.error(
                     f"Please enter exactly {WINDOW_SIZE} values "
-                    f"(you entered {len(data)})."
+                    f"(you entered {len(data)})"
                 )
+
             else:
+
                 payload = {
                     "appliance": appliance.lower().replace(" ", "_"),
                     "data": data
                 }
 
-                with st.spinner("🔄 Predicting appliance power..."):
+                with st.spinner("Predicting appliance power..."):
+
                     response = requests.post(
                         f"{BACKEND_URL}/nilm/predict",
-                        json=payload,
-                        timeout=20
+                        json=payload
                     )
 
                 if response.status_code == 200:
+
                     result = response.json()
 
-                    st.success("### ✅ Prediction Result")
+                    st.success("Prediction Result")
 
-                    st.write(f"🔌 **Appliance:** {result['appliance'].upper()}")
-                    st.write(f"⚡ **Predicted Appliance Power "
-                             f"(at center ≈ 30 min mark):** "
-                             f"{result['predicted_power']:.2f} W"
-                )
+                    st.write("Appliance:", result["appliance"])
+                    st.write("Predicted Power:", round(result["predicted_power"],2),"W")
 
                     if result["state"] == "ON":
-                        st.markdown("🟢 **State:** ON")
+                        st.success("State: ON")
                     else:
-                        st.markdown("🔴 **State:** OFF")
+                        st.error("State: OFF")
 
-                    confidence = result.get("confidence", 0)
-                    confidence_pct = confidence * 100
-                    st.progress(int(confidence_pct))
-                    st.write(f"📊 **Confidence:** {confidence_pct:.1f}%")
+                    confidence = result["confidence"] * 100
+                    st.progress(int(confidence))
+                    st.write("Confidence:", round(confidence,1),"%")
 
-                    # ==================================================
-                    # TIME-SERIES VISUALIZATION
-                    # ==================================================
-                    st.markdown("### 📉 Aggregate Power Window")
+                    fig, ax = plt.subplots()
 
-                    fig, ax = plt.subplots(figsize=(8, 3))
-                    ax.plot(data, label="Aggregate Power", color="blue")
+                    ax.plot(data)
 
-                    center_idx = WINDOW_SIZE // 2
+                    center = WINDOW_SIZE // 2
+
                     ax.axvline(
-                        x=center_idx,
+                        x=center,
                         color="red",
-                        linestyle="--",
-                        label="Prediction Center"
+                        linestyle="--"
                     )
 
-                    ax.set_xlabel("Time Index")
-                    ax.set_ylabel("Power (W)")
-                    ax.set_title(f"{WINDOW_SIZE}-point Input Window (~1 hour) (Seq-to-Point)")
-                    ax.legend()
+                    ax.set_title("Input Power Window")
 
                     st.pyplot(fig)
 
-                    # ==================================================
-                    # MODEL EXPLANATION
-                    # ==================================================
-                    st.markdown("### 🧠 Model Explanation")
-
-                    pred_power = result["predicted_power"]
-                    state = result["state"]
-                    appliance_key = appliance.lower().replace(" ", "_")
-
-                    if appliance_key == "kettle":
-                        threshold = 1000
-                        typical = "1800–2500 W"
-                        behavior = "short high-power bursts"
-                    elif appliance_key == "fridge":
-                        threshold = 10
-                        typical = "70–150 W"
-                        behavior = "continuous low-power operation"
-                    elif appliance_key == "washing_machine":
-                        threshold = 50
-                        typical = "400–2000 W (cyclic)"
-                        behavior = "long cyclic power patterns"
-                    elif appliance_key == "microwave":
-                        threshold = 800
-                        typical = "800–1500 W"
-                        behavior = "short high-power bursts"
-                    else:
-                        threshold = None
-                        typical = "unknown"
-                        behavior = "unknown"
-
-                    if state == "ON":
-                        explanation = (
-                            f"The model predicts that the **{appliance.lower()} is ON** because the "
-                            f"predicted power (**{pred_power:.1f} W**) is above the activation "
-                            f"threshold ({threshold} W). "
-                            f"This aligns with the typical operating range of {typical} and "
-                            f"matches the expected {behavior}."
-                        )
-                    else:
-                        explanation = (
-                            f"The model predicts that the **{appliance.lower()} is OFF** because the "
-                            f"predicted power (**{pred_power:.1f} W**) is below the activation "
-                            f"threshold ({threshold} W). "
-                            f"This indicates no active usage at the center of the window."
-                        )
-
-                    st.info(explanation)
-
                 else:
-                    st.error(
-                        f"Backend error ({response.status_code}): {response.text}"
+                    st.error(response.text)
+
+        except:
+            st.error("Invalid input format.")
+
+# ==================================================
+# NILM RESEARCH EXPERIMENTS
+# ==================================================
+
+st.markdown("---")
+
+st.markdown("""
+## 🧪 NILM Research Experiments
+
+Compare research models used in the NILM paper.
+
+Models available:
+
+• 6-sec CNN (High resolution model)  
+• 1-min CNN (Paper baseline)  
+• 1-min BiGRU (Paper advanced model)
+
+These experiments run **only for fridge appliance**.
+""")
+
+experiment_model = st.selectbox(
+    "Select Experiment Model",
+    [
+        "6sec_cnn",
+        "1min_cnn",
+        "1min_bigru"
+    ]
+)
+
+if experiment_model == "6sec_cnn":
+    EXP_WINDOW = 599
+else:
+    EXP_WINDOW = 510
+
+experiment_input = st.text_area(
+    f"Enter {EXP_WINDOW} aggregate power values",
+    height=150
+)
+
+if st.button("Run NILM Experiment"):
+
+    if experiment_input.strip() == "":
+        st.error("Please enter power values.")
+
+    else:
+        try:
+
+            data = [float(x.strip()) for x in experiment_input.split(",")]
+
+            if len(data) != EXP_WINDOW:
+
+                st.error(
+                    f"Model requires {EXP_WINDOW} values "
+                    f"(you entered {len(data)})"
+                )
+
+            else:
+
+                payload = {"data": data}
+
+                with st.spinner("Running experiment..."):
+
+                    response = requests.post(
+                        f"{BACKEND_URL}/nilm/experiments/{experiment_model}",
+                        json=payload
                     )
 
-        except requests.exceptions.Timeout:
-            st.error("⏱ Backend took too long to respond.")
-        except requests.exceptions.ConnectionError:
-            st.error("❌ Cannot connect to backend. Is FastAPI running?")
-        except ValueError:
-            st.error("Invalid input format. Use numbers separated by commas.")
+                if response.status_code == 200:
+
+                    result = response.json()
+
+                    st.success("Experiment Completed")
+
+                    st.write("Model:", result["model_type"])
+                    st.write("Prediction Shape:", result["prediction_shape"])
+
+                    prediction = result["prediction"]
+
+                    st.markdown("### 📉 Input Aggregate Power")
+
+                    fig_input, ax_input = plt.subplots(figsize=(8,3))
+
+                    ax_input.plot(data, color="blue")
+
+                    ax_input.set_xlabel("Time Index")
+                    ax_input.set_ylabel("Power (W)")
+                    ax_input.set_title("Aggregate Power Window")
+
+                    st.pyplot(fig_input)
+
+
+                    st.markdown("### ⚡ Predicted Appliance Power")
+
+                    fig_pred, ax_pred = plt.subplots(figsize=(8,3))
+
+                    if len(prediction) > 1:
+                        ax_pred.plot(prediction, color="green")
+                    else:
+                        ax_pred.scatter([0], prediction, color="green")
+
+                    ax_pred.set_xlabel("Time Index")
+                    ax_pred.set_ylabel("Power (W)")
+                    ax_pred.set_title("Predicted Appliance Power")
+
+                    st.pyplot(fig_pred)
+
+                else:
+                    st.error(response.text)
+
+        except:
+            st.error("Invalid input format.")
 
 # ==================================================
 # FORECASTING SECTION
 # ==================================================
+
 st.markdown("---")
+
 st.markdown("""
-### 📈 Energy Consumption Forecasting & Bill Estimation
+### 📈 Energy Consumption Forecasting
 
-Provide the last **60 mains power readings** (6 minutes of data).
-
-🔮 The model predicts the **power consumption 6 seconds into the future**.
-Based on that prediction, we estimate daily energy usage and monthly electricity cost.
+Provide **60 mains power readings**.
 """)
+
 forecast_input = st.text_area(
-    "Enter exactly 60 recent mains power values (comma-separated)",
+    "Enter 60 power values",
     height=120
 )
 
 if st.button("Predict & Estimate Bill"):
 
     if forecast_input.strip() == "":
-        st.error("Please enter power values.")
+        st.error("Please enter values")
+
     else:
         try:
+
             data = [float(x.strip()) for x in forecast_input.split(",")]
 
             if len(data) != 60:
-                st.error(f"Please enter exactly 60 values (you entered {len(data)}).")
+                st.error("Enter exactly 60 values")
+
             else:
 
                 payload = {"data": data}
 
-                with st.spinner("🔄 Predicting and estimating bill..."):
+                with st.spinner("Predicting..."):
+
                     response = requests.post(
                         f"{BACKEND_URL}/forecast/predict",
-                        json=payload,
-                        timeout=10
+                        json=payload
                     )
 
                 if response.status_code == 200:
+
                     result = response.json()
 
-                    predicted_power = result["predicted_next_power_watts"]
-                    daily_energy = result["estimated_daily_energy_kwh"]
-                    monthly_bill = result["estimated_monthly_bill_rupees"]
+                    st.success("Forecast Result")
 
-                    st.success("### 🔮 Forecast Result")
+                    st.write(
+                        "Predicted Next Power:",
+                        round(result["predicted_next_power_watts"],2),
+                        "W"
+                    )
 
-                    st.write(f"⚡ **Predicted (Next 6 Seconds):** {predicted_power:.2f} W")
-                    st.write(f"📊 **Estimated Daily Energy:** {daily_energy:.2f} kWh")
-                    st.write(f"💰 **Estimated Monthly Bill:** ₹{monthly_bill:.2f}")
+                    st.write(
+                        "Estimated Daily Energy:",
+                        round(result["estimated_daily_energy_kwh"],2),
+                        "kWh"
+                    )
 
-                    # ----------------------------------------
-                    # Visualization
-                    # ----------------------------------------
-                    st.markdown("### 📉 Recent Power Window")
+                    st.write(
+                        "Estimated Monthly Bill:",
+                        "₹",
+                        round(result["estimated_monthly_bill_rupees"],2)
+                    )
 
-                    fig, ax = plt.subplots(figsize=(8, 3))
-                    ax.plot(data, label="Recent Power", color="blue")
-                    ax.set_xlabel("Time Index")
-                    ax.set_ylabel("Power (W)")
-                    ax.set_title("Last 60 Data Points")
-                    ax.legend()
+                    fig, ax = plt.subplots()
+
+                    ax.plot(data)
+
+                    ax.set_title("Recent Power Window")
 
                     st.pyplot(fig)
 
-                    # ----------------------------------------
-                    # Explanation
-                    # ----------------------------------------
-                    st.markdown("### 🧠 Projection Explanation")
-
-                    explanation = (
-                        f"The model predicts that your next power consumption "
-                        f"will be approximately **{predicted_power:.1f} watts**. "
-                        f"Assuming similar consumption continues, your estimated "
-                        f"daily usage would be **{daily_energy:.2f} kWh**, "
-                        f"leading to an approximate monthly bill of "
-                        f"**₹{monthly_bill:.2f}** (at ₹6 per unit)."
-                    )
-
-                    st.info(explanation)
-
                 else:
-                    st.error(f"Backend error: {response.text}")
+                    st.error(response.text)
 
-        except ValueError:
-            st.error("Invalid input format. Use numbers separated by commas.")
+        except:
+            st.error("Invalid format.")
 
 # ==================================================
 # ANOMALY DETECTION SECTION
 # ==================================================
+
 st.markdown("---")
+
 st.markdown("""
-### 🚨 Intelligent Anomaly Detection (Hybrid AI + Safety)
-
-Provide the last **60 mains power readings** (6 minutes of data).
-
-🧠 The system checks:
-- AI-based abnormal pattern detection
-- Safety limit violation (overload detection)
-
-It classifies the behavior as:
-- 🟢 Normal
-- 🟡 Mild anomaly
-- 🔴 Severe anomaly
+### 🚨 Anomaly Detection
+Provide **60 recent mains power readings**.
 """)
 
 anomaly_input = st.text_area(
-    "Enter 60 mains power values (comma-separated)",
+    "Enter 60 values",
     height=120
 )
 
 if st.button("Detect Anomaly"):
 
     if anomaly_input.strip() == "":
-        st.error("Please enter power values.")
+        st.error("Please enter values")
+
     else:
         try:
+
             data = [float(x.strip()) for x in anomaly_input.split(",")]
 
             if len(data) != 60:
-                st.error(f"Please enter exactly 60 values (you entered {len(data)}).")
+                st.error("Enter exactly 60 values")
+
             else:
 
                 payload = {"data": data}
 
-                with st.spinner("🔍 Analyzing power behavior..."):
+                with st.spinner("Analyzing..."):
+
                     response = requests.post(
                         f"{BACKEND_URL}/anomaly/detect",
-                        json=payload,
-                        timeout=10
+                        json=payload
                     )
 
                 if response.status_code == 200:
+
                     result = response.json()
 
-                    error = result["reconstruction_error"]
-                    threshold = result["threshold"]
-                    max_power = result["max_power_observed"]
-                    safe_limit = result["safe_limit"]
                     severity = result["severity"]
 
-                    # ----------------------------------------
-                    # Severity Display
-                    # ----------------------------------------
                     if severity == "normal":
-                        st.success("🟢 Normal Usage Detected")
+                        st.success("Normal usage detected")
                     elif severity == "mild":
-                        st.warning("🟡 Mild Anomaly Detected")
+                        st.warning("Mild anomaly detected")
                     else:
-                        st.error("🔴 Severe Anomaly Detected")
+                        st.error("Severe anomaly detected")
 
-                    # ----------------------------------------
-                    # Metrics Display
-                    # ----------------------------------------
-                    st.write(f"📊 Reconstruction Error: {error:.4f}")
-                    st.write(f"📏 Threshold: {threshold:.4f}")
-                    st.write(f"⚡ Max Power Observed: {max_power:.2f} W")
-                    st.write(f"🔒 Safety Limit: {safe_limit:.2f} W")
+                    st.write(
+                        "Reconstruction Error:",
+                        round(result["reconstruction_error"],4)
+                    )
 
-                    # ----------------------------------------
-                    # Visualization
-                    # ----------------------------------------
-                    st.markdown("### 📉 Power Pattern (Last 6 Minutes)")
+                    st.write(
+                        "Max Power Observed:",
+                        round(result["max_power_observed"],2),
+                        "W"
+                    )
 
-                    fig, ax = plt.subplots(figsize=(8, 3))
-                    ax.plot(data, label="Mains Power", color="blue")
+                    fig, ax = plt.subplots()
 
-                    # Highlight spike if exceeds safety
-                    if max_power > safe_limit:
-                        ax.axhline(y=safe_limit, color='red', linestyle='--', label="Safety Limit")
+                    ax.plot(data)
 
-                    ax.set_xlabel("Time Index")
-                    ax.set_ylabel("Power (W)")
-                    ax.set_title("60-Point Power Window")
-                    ax.legend()
+                    ax.set_title("Power Pattern")
 
                     st.pyplot(fig)
 
-                    # ----------------------------------------
-                    # Explanation
-                    # ----------------------------------------
-                    st.markdown("### 🧠 Explanation")
-
-                    if severity == "normal":
-                        explanation = (
-                            "The recent power usage follows the learned normal household pattern. "
-                            "No abnormal or unsafe behavior detected."
-                        )
-                    elif severity == "mild":
-                        explanation = (
-                            "The power pattern shows slight deviation from normal behavior. "
-                            "This may indicate unusual appliance usage but not a critical issue."
-                        )
-                    else:
-                        explanation = (
-                            "The system detected significant abnormal behavior or a power spike "
-                            "exceeding safe operating limits. This may indicate overload, "
-                            "faulty appliance, or high-energy device usage."
-                        )
-
-                    st.info(explanation)
-
                 else:
-                    st.error(f"Backend error: {response.text}")
+                    st.error(response.text)
 
-        except ValueError:
-            st.error("Invalid input format. Use numbers separated by commas.")
+        except:
+            st.error("Invalid format.")

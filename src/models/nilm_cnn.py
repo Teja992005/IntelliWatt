@@ -3,15 +3,10 @@ from tensorflow.keras.layers import Conv1D, Dense, Dropout, GlobalAveragePooling
 from tensorflow.keras.optimizers import Adam
 
 
-def build_nilm_cnn(window_size, base_filters=16):
-    """
-    Improved Seq-to-Point CNN for NILM (599 window)
-    Deeper temporal feature extraction
-    """
+def build_nilm_cnn(window_size, output_length, base_filters=16):
 
     model = Sequential()
 
-    # -------- Convolutional feature extractor --------
     model.add(
         Conv1D(
             filters=base_filters,
@@ -38,16 +33,13 @@ def build_nilm_cnn(window_size, base_filters=16):
     )
 
     model.add(GlobalAveragePooling1D())
-
-    # -------- Dense regression head --------
-    model.add(Dense(128, activation="relu"))
+    model.add(Dense(256, activation="relu"))
     model.add(Dropout(0.3))
-    model.add(Dense(1))
+    model.add(Dense(output_length))
 
     model.compile(
         optimizer=Adam(learning_rate=1e-3),
-        loss="mse",
-        metrics=["mae"]
+        loss="mse"
     )
 
     return model

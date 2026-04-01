@@ -5,6 +5,7 @@ import numpy as np
 import joblib
 from tensorflow.keras.models import load_model
 import json
+
 app = FastAPI(title="IntelliWatt API")
 
 # ==================================================
@@ -13,7 +14,6 @@ app = FastAPI(title="IntelliWatt API")
 
 WINDOW_SIZE = 599
 
-# Appliance → model & scaler mapping
 APPLIANCE_MODELS = {
     "fridge": {
         "model": "src/models/nilm_fridge.h5",
@@ -23,7 +23,7 @@ APPLIANCE_MODELS = {
         "model": "src/models/nilm_kettle.h5",
         "scaler": "src/models/nilm_kettle_scaler.pkl"
     },
-    "washing_machine": {  
+    "washing_machine": {
         "model": "src/models/nilm_washing_machine.h5",
         "scaler": "src/models/nilm_washing_machine_scaler.pkl"
     },
@@ -31,6 +31,32 @@ APPLIANCE_MODELS = {
         "model": "src/models/nilm_microwave.h5",
         "scaler": "src/models/nilm_microwave_scaler.pkl"
     }
+}
+
+# ==================================================
+# RESEARCH EXPERIMENT MODELS (FRIDGE ONLY)
+# ==================================================
+
+EXPERIMENT_MODELS = {
+
+    "6sec_cnn": {
+        "model": "saved_models/seq2seq_6sec/fridge_model.h5",
+        "scaler": "saved_models/seq2seq_6sec/fridge_scaler.pkl",
+        "window": 599
+    },
+
+    "1min_cnn": {
+        "model": "saved_models/paper_versions/fridge_paper_cnn.h5",
+        "scaler": None,
+        "window": 510
+    },
+
+    "1min_bigru": {
+        "model": "saved_models/paper_versions/fridge_paper_bigru.h5",
+        "scaler": None,
+        "window": 510
+    }
+
 }
 
 MODEL_CACHE = {}
@@ -64,8 +90,11 @@ class ForecastRequest(BaseModel):
 class AnomalyRequest(BaseModel):
     data: List[float]
 
+class NILMExperimentRequest(BaseModel):
+    data: List[float]
+
 # ==================================================
-# ROUTES
+# ROOT
 # ==================================================
 
 @app.get("/")
@@ -93,44 +122,42 @@ def predict_nilm(request: NILMRequest):
             detail=f"NILM expects exactly {WINDOW_SIZE} input values"
         )
 
-    # Load model lazily
+    config = APPLIANCE_MODELS[appliance]
+
+    # Load model
     if appliance not in MODEL_CACHE:
         MODEL_CACHE[appliance] = load_model(
-            APPLIANCE_MODELS[appliance]["model"],
+            config["model"],
             compile=False
         )
 
+    # Load scaler
     if appliance not in SCALER_CACHE:
         SCALER_CACHE[appliance] = joblib.load(
-            APPLIANCE_MODELS[appliance]["scaler"]
+            config["scaler"]
         )
 
     model = MODEL_CACHE[appliance]
     scaler = SCALER_CACHE[appliance]
 
-    # Preprocess input
     x = np.array(request.data, dtype=np.float32).reshape(-1, 1)
     x = scaler.transform(x)
     x = x.reshape(1, WINDOW_SIZE, 1)
 
     prediction = float(model.predict(x, verbose=0)[0][0])
-    prediction = max(prediction, 0.0)  # No negative power
+    prediction = max(prediction, 0.0)
 
-    # Thresholds
     THRESHOLDS = {
         "fridge": 10,
         "kettle": 1000,
         "washing_machine": 50,
         "microwave": 800
-
     }
 
     threshold = THRESHOLDS[appliance]
 
-    distance = abs(prediction - threshold)
-    confidence = float(min(distance / threshold, 1.0))
+    confidence = float(min(abs(prediction - threshold) / threshold, 1.0))
 
-    # Decide ON / OFF
     if appliance == "fridge":
         state = "ON" if prediction > 10 else "OFF"
     elif appliance == "kettle":
@@ -150,6 +177,63 @@ def predict_nilm(request: NILMRequest):
     }
 
 # ==================================================
+# NILM EXPERIMENTS (FRIDGE ONLY)
+# ==================================================
+
+@app.post("/nilm/experiments/{model_type}")
+def predict_experiment(model_type: str, request: NILMExperimentRequest):
+
+    if model_type not in EXPERIMENT_MODELS:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid experiment model type"
+        )
+
+    config = EXPERIMENT_MODELS[model_type]
+    window_size = config["window"]
+
+    if len(request.data) != window_size:
+        raise HTTPException(
+            status_code=400,
+            detail=f"This model expects {window_size} input values"
+        )
+
+    # Load model
+    if model_type not in MODEL_CACHE:
+        MODEL_CACHE[model_type] = load_model(
+            config["model"],
+            compile=False
+        )
+
+    model = MODEL_CACHE[model_type]
+
+    scaler = None
+
+    if config["scaler"] is not None:
+
+        if model_type not in SCALER_CACHE:
+            SCALER_CACHE[model_type] = joblib.load(
+                config["scaler"]
+            )
+
+        scaler = SCALER_CACHE[model_type]
+
+    x = np.array(request.data, dtype=np.float32).reshape(-1, 1)
+
+    if scaler is not None:
+        x = scaler.transform(x)
+
+    x = x.reshape(1, window_size, 1)
+
+    prediction = model.predict(x, verbose=0)
+
+    return {
+        "model_type": model_type,
+        "prediction_shape": list(prediction.shape),
+        "prediction": prediction.flatten().tolist()
+    }
+
+# ==================================================
 # FORECASTING API
 # ==================================================
 
@@ -164,7 +248,6 @@ def predict_forecast(request: ForecastRequest):
 
     series = np.array(request.data, dtype=np.float32)
 
-    # Load scaler
     scaler = joblib.load("src/models/forecast_scaler.pkl")
 
     scaled = scaler.transform(
@@ -177,16 +260,8 @@ def predict_forecast(request: ForecastRequest):
 
     prediction = max(prediction, 0.0)
 
-    # -------------------------------
-    # Stable Energy Projection
-    # -------------------------------
-
-    # Convert W → kWh for 1 day
     daily_energy_kwh = (prediction / 1000) * 24
-
-    # Assume ₹6 per unit (changeable)
     TARIFF = 6
-
     monthly_bill = daily_energy_kwh * 30 * TARIFF
 
     return {
@@ -194,13 +269,13 @@ def predict_forecast(request: ForecastRequest):
         "estimated_daily_energy_kwh": daily_energy_kwh,
         "estimated_monthly_bill_rupees": monthly_bill
     }
+
 # ==================================================
 # ANOMALY DETECTION API
 # ==================================================
-# Load anomaly scaler
+
 anomaly_scaler = joblib.load("src/models/anomaly_scaler.pkl")
 
-# Load anomaly threshold
 with open("metrics/anomaly_metrics.json", "r") as f:
     anomaly_config = json.load(f)
 
@@ -218,9 +293,6 @@ def detect_anomaly(request: AnomalyRequest):
 
     series = np.array(request.data, dtype=np.float32)
 
-    # ---------------------------
-    # AI Reconstruction Part
-    # ---------------------------
     series_scaled = anomaly_scaler.transform(
         series.reshape(1, -1)
     ).reshape(1, ANOMALY_WINDOW, 1)
@@ -231,20 +303,12 @@ def detect_anomaly(request: AnomalyRequest):
         np.square(series_scaled - reconstructed)
     ))
 
-    # ---------------------------
-    # Safety Rule Part
-    # ---------------------------
-    SAFE_LIMIT = 3000  # watts
-
+    SAFE_LIMIT = 3000
     max_power = float(np.max(series))
 
-    # ---------------------------
-    # Severity Logic (Hybrid)
-    # ---------------------------
     if max_power > SAFE_LIMIT:
         severity = "severe"
         is_anomaly = True
-
     else:
         if error <= ANOMALY_THRESHOLD:
             severity = "normal"

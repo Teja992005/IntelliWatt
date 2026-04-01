@@ -5,50 +5,39 @@ sys.path.append(os.path.abspath("src"))
 import numpy as np
 import joblib
 import matplotlib.pyplot as plt
+import time
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 
 from models.nilm_cnn import build_nilm_cnn
-from evaluation.metrics import (
-    mean_absolute_error,
-    root_mean_squared_error,
-    power_to_state,
-    f1_score
-)
+from evaluation.metrics import mean_absolute_error, root_mean_squared_error
 
 
 def main():
-    print("=== TRAIN_NILM_FRIDGE STARTED ===")
+    print("=== TRAIN_NILM_FRIDGE (6-sec Seq2Seq) STARTED ===")
 
-    # --------------------------------------------------
-    # Load fridge-specific data
-    # --------------------------------------------------
+
     X = np.load("data/processed/X_fridge.npy")
     y = np.load("data/processed/y_fridge.npy")
 
-    print("Loaded fridge data")
     print("X shape:", X.shape)
     print("y shape:", y.shape)
 
     if X.ndim == 2:
         X = X.reshape((X.shape[0], X.shape[1], 1))
 
-    # --------------------------------------------------
-    # Train / validation split
-    # --------------------------------------------------
+    output_length = y.shape[1]
+
+
     X_train, X_val, y_train, y_val = train_test_split(
-        X,
-        y,
+        X, y,
         test_size=0.2,
         random_state=42,
         shuffle=True
     )
 
-    # --------------------------------------------------
-    # Normalize mains input only
-    # --------------------------------------------------
     scaler = StandardScaler()
 
     X_train = scaler.fit_transform(
@@ -59,15 +48,12 @@ def main():
         X_val.reshape(-1, 1)
     ).reshape(X_val.shape)
 
-    os.makedirs("src/models", exist_ok=True)
-    joblib.dump(scaler, "src/models/nilm_fridge_scaler.pkl")
-    print("Fridge scaler saved")
+    os.makedirs("saved_models/seq2seq_6sec", exist_ok=True)
+    joblib.dump(scaler, "saved_models/seq2seq_6sec/fridge_scaler.pkl")
 
-    # --------------------------------------------------
-    # Build model
-    # --------------------------------------------------
     model = build_nilm_cnn(
         window_size=X_train.shape[1],
+        output_length=output_length,
         base_filters=16
     )
 
@@ -78,10 +64,12 @@ def main():
     )
 
     checkpoint = ModelCheckpoint(
-        "src/models/nilm_fridge.h5",
+        "saved_models/seq2seq_6sec/fridge_model.h5",
         monitor="val_loss",
         save_best_only=True
     )
+
+    start_time = time.time()
 
     history = model.fit(
         X_train,
@@ -93,77 +81,30 @@ def main():
         verbose=1
     )
 
-    # --------------------------------------------------
-    # Save Training Loss Curve
-    # --------------------------------------------------
-    os.makedirs("reports", exist_ok=True)
+    training_time = time.time() - start_time
+
+    print("Training Time:", training_time)
+
+
+    os.makedirs("reports/seq2seq_6sec", exist_ok=True)
 
     plt.figure()
-    plt.plot(model.history["loss"], label="Train Loss")
-    plt.plot(model.history["val_loss"], label="Val Loss")
-    plt.xlabel("Epoch")
-    plt.ylabel("MSE Loss")
-    plt.title("Fridge Training Loss Curve")
+    plt.plot(history.history["loss"], label="Train Loss")
+    plt.plot(history.history["val_loss"], label="Val Loss")
     plt.legend()
-    plt.savefig("reports/fridge_loss_curve.png")
+    plt.title("6-sec Seq2Seq Fridge Loss")
+    plt.savefig("reports/seq2seq_6sec/fridge_loss.png")
     plt.close()
 
-    print("Saved: reports/fridge_loss_curve.png")
+    y_pred = model.predict(X_val)
 
-    # --------------------------------------------------
-    # Evaluation
-    # --------------------------------------------------
-    print("\nEvaluating FRIDGE NILM model...")
+    mae = mean_absolute_error(y_val.flatten(), y_pred.flatten())
+    rmse = root_mean_squared_error(y_val.flatten(), y_pred.flatten())
 
-    y_val_flat = y_val.reshape(-1)
-    y_pred_flat = model.predict(X_val, batch_size=1024).reshape(-1)
+    print("Validation MAE:", mae)
+    print("Validation RMSE:", rmse)
 
-    mae = mean_absolute_error(y_val_flat, y_pred_flat)
-    rmse = root_mean_squared_error(y_val_flat, y_pred_flat)
-
-    print("Validation MAE (Watts):", round(mae, 2))
-    print("Validation RMSE (Watts):", round(rmse, 2))
-
-    # --------------------------------------------------
-    # ON / OFF detection
-    # --------------------------------------------------
-    THRESHOLD = 10
-
-    y_true_state = power_to_state(y_val_flat, THRESHOLD)
-    y_pred_state = power_to_state(y_pred_flat, THRESHOLD)
-
-    f1 = f1_score(y_true_state, y_pred_state)
-    print("ON/OFF Detection F1-score:", round(f1, 3))
-
-    # --------------------------------------------------
-    # Save Metrics Plot
-    # --------------------------------------------------
-    plt.figure()
-
-    metrics_names = ["MAE", "RMSE", "F1"]
-    metrics_values = [mae, rmse, f1]
-
-    plt.bar(metrics_names, metrics_values)
-    plt.title("Fridge NILM Metrics")
-    plt.ylabel("Value")
-    plt.savefig("reports/fridge_metrics.png")
-    plt.close()
-
-    print("Saved: reports/fridge_metrics.png")
-
-    # --------------------------------------------------
-    # Save metrics JSON
-    # --------------------------------------------------
-    from evaluation.save_metrics import save_metrics
-
-    save_metrics(
-        appliance_name="fridge",
-        mae=mae,
-        rmse=rmse,
-        f1_score=f1
-    )
-
-    print("=== TRAIN_NILM_FRIDGE COMPLETED ===")
+    print("=== COMPLETED ===")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,10 @@
+{
+    "model": "Paper_BiGRU",
+    "appliance": "Fridge",
+    "sampling": "1_minute",
+    "input_length": 510,
+    "epochs": 30,
+    "mae": 22.378276824951172,
+    "rmse": 29.195218423717844,
+    "training_time_seconds": 15159.33453822136
+}

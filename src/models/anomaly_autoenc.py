@@ -7,15 +7,9 @@ def build_autoencoder(input_dim):
     """
 
     model = Sequential()
-
-    # Encoder
     model.add(Dense(32, activation="relu", input_shape=(input_dim,)))
     model.add(Dense(16, activation="relu"))
-
-    # Bottleneck
     model.add(Dense(8, activation="relu"))
-
-    # Decoder
     model.add(Dense(16, activation="relu"))
     model.add(Dense(32, activation="relu"))
     model.add(Dense(input_dim, activation="linear"))

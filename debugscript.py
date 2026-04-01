@@ -20,8 +20,15 @@
 import joblib
 import numpy as np
 
-# Load your current (new) scaler
-scaler = joblib.load("src/models/nilm_fridge_scaler.pkl")
+# # Load your current (new) scaler
+# scaler = joblib.load("src/models/nilm_fridge_scaler.pkl")
 
-print(f"Mean: {scaler.mean_}")
-print(f"Scale: {scaler.scale_}")
+# print(f"Mean: {scaler.mean_}")
+# print(f"Scale: {scaler.scale_}")
+
+import h5py
+
+with h5py.File("data/ukdale/ukdale.h5", "r") as f:
+    table = f["building1/elec/meter1/table"]
+    print(table.dtype)
+    print(table[:5])
