@@ -1,7 +1,9 @@
 {
-    "model": "cnn_anomaly_autoencoder",
+    "model": "dense_anomaly_autoencoder",
     "window_size": 60,
-    "mae": 0.016304800286889076,
-    "rmse": 0.053964827209711075,
-    "threshold": 0.06548970192670822
+    "threshold": 1.509544849395752,
+    "mean_error": 0.06987056881189346,
+    "std_error": 0.22958628833293915,
+    "validation_samples": 50000,
+    "max_samples_used": 250000
 }

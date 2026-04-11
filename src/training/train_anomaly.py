@@ -11,7 +11,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 
 sys.path.append(os.path.abspath("src"))
 
-from models.anomaly_autoenc import build_lstm_autoencoder
+from models.anomaly_autoenc import build_autoencoder
 
 
 WINDOW_SIZE = 60
@@ -59,7 +59,7 @@ def save_training_plots(history, reconstruction_errors, threshold):
     plt.plot(history.history["val_loss"], label="Validation Loss", linewidth=2)
     plt.xlabel("Epoch")
     plt.ylabel("Reconstruction MSE")
-    plt.title("Anomaly LSTM Training Curve")
+    plt.title("Anomaly Autoencoder Training Curve")
     plt.legend()
     plt.tight_layout()
     plt.savefig("reports/anomaly_loss_curve.png")
@@ -102,7 +102,7 @@ def main():
     print("Train shape:", X_train.shape)
     print("Validation shape:", X_val.shape)
 
-    model = build_lstm_autoencoder(WINDOW_SIZE, latent_dim=64, dropout_rate=0.2)
+    model = build_autoencoder(WINDOW_SIZE, latent_dim=64, dropout_rate=0.2)
     model.summary()
 
     callbacks = [
@@ -141,7 +141,7 @@ def main():
     print("Saved anomaly training plots")
 
     metrics = {
-        "model": "lstm_anomaly_autoencoder",
+        "model": "dense_anomaly_autoencoder",
         "window_size": WINDOW_SIZE,
         "threshold": threshold,
         "mean_error": float(reconstruction_errors.mean()),

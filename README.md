@@ -6,7 +6,7 @@ A complete deep learning–based smart energy monitoring platform built on the *
 - 🔌 NILM (Seq-to-Seq CNN)
 - 🔌 NILM (BiGRU – Bidirectional Gated Recurrent Unit)
 - 📈 LSTM Load Forecasting
-- 🚨 Hybrid Anomaly Detection (LSTM Autoencoder + Safety Rule)
+- 🚨 Hybrid Anomaly Detection (Dense Autoencoder + Safety Rule)
 - 💰 Monthly Bill Estimation
 - ⚙ FastAPI Backend
 - 📊 Streamlit Dashboard
@@ -23,7 +23,7 @@ flowchart TD
 
     C1[NILM Model Seq-to-Point CNN]
     C2[Forecasting Model LSTM]
-    C3[Anomaly Model LSTM Autoencoder]
+    C3[Anomaly Model Dense Autoencoder]
 
     D1[Appliance Level Power]
     D2[Future Load Prediction]
@@ -66,7 +66,7 @@ UK-DALE data
         └─► Task-Specific Training Datasets
               ├─► NILM (Seq-to-Point CNN / Seq-to-Seq CNN / BiGRU)
               ├─► Load Forecasting (LSTM)
-              └─► Anomaly Detection (LSTM Autoencoder)
+              └─► Anomaly Detection (Dense Autoencoder)
                     └─► Trained Models & Scalers
                           └─► FastAPI Endpoints (/predict_nilm, /forecast, /detect_anomaly, /estimate_bill)
                                 └─► Streamlit Dashboard (interactive visualization & alerts)
@@ -162,7 +162,7 @@ Used for:
 
 ### 🚨 3. Hybrid Anomaly Detection
 
-#### LSTM Autoencoder
+#### Dense Autoencoder (Fully-Connected)
 
 - Trained on normal sequences
 - Uses reconstruction MSE
@@ -266,7 +266,7 @@ streamlit run frontend/streamlit_app.py
 - Convolutional Neural Networks (CNN) — Seq-to-Point & Seq-to-Seq
 - Bidirectional Gated Recurrent Units (BiGRU)
 - Long Short-Term Memory (LSTM)
-- LSTM Autoencoder (Unsupervised)
+- Dense Autoencoder (Unsupervised)
 - Hybrid Rule-Based + Deep Learning Detection
 
 ---

@@ -597,8 +597,7 @@ st.markdown(
         <div class="iw-hero-title">IntelliWatt <span>Dashboard</span></div>
         <div class="iw-hero-sub">
             A professional energy intelligence cockpit for appliance disaggregation,
-            load forecasting, anomaly detection, and NILM research — powered by your
-            existing AI pipeline with zero backend changes.
+            load forecasting, anomaly detection, and NILM research.
         </div>
     </div>
     """,
