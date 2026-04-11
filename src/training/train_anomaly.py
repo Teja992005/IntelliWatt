@@ -1,192 +1,162 @@
-import sys
+import json
 import os
+import sys
+
+import joblib
+import matplotlib.pyplot as plt
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+
 sys.path.append(os.path.abspath("src"))
 
-import numpy as np
-import pandas as pd
-import json
-import joblib
-
-from sklearn.preprocessing import StandardScaler
-from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Input, Conv1D, MaxPooling1D, UpSampling1D
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
-
-from evaluation.metrics import (
-    mean_absolute_error,
-    root_mean_squared_error
-)
-
-H5_PATH = "data/ukdale/ukdale.h5"
+from models.anomaly_autoenc import build_lstm_autoencoder
 
 
-# CNN AUTOENCODER (FAST)
+WINDOW_SIZE = 60
+MAX_SAMPLES = 250_000
+VAL_SIZE = 0.2
+EPOCHS = 30
+BATCH_SIZE = 128
+RANDOM_STATE = 42
+DATA_PATH = "data/processed/X_forecast_mains.npy"
 
 
-def build_cnn_autoencoder(window_size):
+def load_training_windows(path, max_samples, random_state):
+    """
+    Load forecast mains windows and sample across the full dataset so the
+    anomaly model sees a broader slice of normal behavior.
+    """
 
-    inputs = Input(shape=(window_size,1))
+    windows = np.load(path)
+    windows = windows.reshape((windows.shape[0], windows.shape[1])).astype("float32")
 
-    # Encoder
-    x = Conv1D(32,3,activation="relu",padding="same")(inputs)
-    x = MaxPooling1D(2,padding="same")(x)
+    if len(windows) > max_samples:
+        rng = np.random.default_rng(random_state)
+        indices = np.sort(rng.choice(len(windows), size=max_samples, replace=False))
+        windows = windows[indices]
 
-    x = Conv1D(16,3,activation="relu",padding="same")(x)
-    x = MaxPooling1D(2,padding="same")(x)
-
-    # Decoder
-    x = Conv1D(16,3,activation="relu",padding="same")(x)
-    x = UpSampling1D(2)(x)
-
-    x = Conv1D(32,3,activation="relu",padding="same")(x)
-    x = UpSampling1D(2)(x)
-
-    outputs = Conv1D(1,3,activation="linear",padding="same")(x)
-
-    model = Model(inputs,outputs)
-
-    model.compile(
-        optimizer="adam",
-        loss="mse"
-    )
-
-    return model
+    return windows
 
 
+def compute_threshold(errors):
+    """
+    Use a conservative threshold from the high-error tail while still
+    recording mean/std for inspection and backward compatibility.
+    """
+
+    percentile_threshold = np.percentile(errors, 99.5)
+    mean_std_threshold = errors.mean() + 3 * errors.std()
+    return float(max(percentile_threshold, mean_std_threshold))
 
 
-def create_sequences(data, window_size):
+def save_training_plots(history, reconstruction_errors, threshold):
+    os.makedirs("reports", exist_ok=True)
 
-    sequences = []
+    plt.figure(figsize=(8, 4))
+    plt.plot(history.history["loss"], label="Train Loss", linewidth=2)
+    plt.plot(history.history["val_loss"], label="Validation Loss", linewidth=2)
+    plt.xlabel("Epoch")
+    plt.ylabel("Reconstruction MSE")
+    plt.title("Anomaly LSTM Training Curve")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("reports/anomaly_loss_curve.png")
+    plt.close()
 
-    for i in range(len(data) - window_size):
-        sequences.append(data[i:i+window_size])
+    plt.figure(figsize=(8, 4))
+    plt.hist(reconstruction_errors, bins=60, color="#d96c2f", alpha=0.85)
+    plt.axvline(threshold, color="#117a7a", linestyle="--", linewidth=2, label="Threshold")
+    plt.xlabel("Reconstruction Error")
+    plt.ylabel("Frequency")
+    plt.title("Anomaly Reconstruction Error Distribution")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("reports/anomaly_error_distribution.png")
+    plt.close()
 
-    return np.array(sequences)
 
 def main():
+    print("=== TRAIN_ANOMALY_MODEL STARTED ===")
 
-    print("=== TRAIN_FAST_ANOMALY_MODEL STARTED ===")
-
-    store = pd.HDFStore(H5_PATH)
-    mains = store["/building1/elec/meter1"]
-    store.close()
-
-    mains.index = pd.to_datetime(mains.index)
-
-    if mains.index.tz:
-        mains.index = mains.index.tz_localize(None)
-
-    mains = mains.resample("6s").mean().dropna()
-
-    series_watts = mains["power"].values.astype("float32")
-
-    print("Loaded mains series:",series_watts.shape)
-
-
-    MAX_POINTS = 200000
-
-    if len(series_watts) > MAX_POINTS:
-        series_watts = series_watts[:MAX_POINTS]
-
-    print("Using series length:",len(series_watts))
-
+    print(f"Loading windows from: {DATA_PATH}")
+    X = load_training_windows(DATA_PATH, MAX_SAMPLES, RANDOM_STATE)
+    print("Training windows shape:", X.shape)
 
     scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    X_scaled = X_scaled.reshape((X_scaled.shape[0], WINDOW_SIZE, 1))
 
-    series_scaled = scaler.fit_transform(series_watts.reshape(-1,1))
+    os.makedirs("src/models", exist_ok=True)
+    joblib.dump(scaler, "src/models/anomaly_scaler.pkl")
+    print("Saved scaler: src/models/anomaly_scaler.pkl")
 
-    os.makedirs("src/models",exist_ok=True)
+    X_train, X_val = train_test_split(
+        X_scaled,
+        test_size=VAL_SIZE,
+        random_state=RANDOM_STATE,
+        shuffle=True,
+    )
 
-    joblib.dump(scaler,"src/models/anomaly_scaler.pkl")
+    print("Train shape:", X_train.shape)
+    print("Validation shape:", X_val.shape)
 
-    print("Scaler saved")
-
-    WINDOW_SIZE = 60
-
-    sequences = create_sequences(series_scaled,WINDOW_SIZE)
-
-    sequences = sequences.reshape(sequences.shape[0],WINDOW_SIZE,1)
-
-    print("Sequence shape:",sequences.shape)
-
-    split = int(0.8 * len(sequences))
-
-    X_train = sequences[:split]
-    X_val = sequences[split:]
-
-    print("Train sequences:",X_train.shape)
-    print("Validation sequences:",X_val.shape)
-
-    model = build_cnn_autoencoder(WINDOW_SIZE)
-
+    model = build_lstm_autoencoder(WINDOW_SIZE, latent_dim=64, dropout_rate=0.2)
     model.summary()
 
-    early_stop = EarlyStopping(
-        monitor="val_loss",
-        patience=5,
-        restore_best_weights=True
-    )
+    callbacks = [
+        EarlyStopping(
+            monitor="val_loss",
+            patience=6,
+            restore_best_weights=True,
+        ),
+        ReduceLROnPlateau(
+            monitor="val_loss",
+            factor=0.5,
+            patience=3,
+            min_lr=1e-5,
+            verbose=1,
+        ),
+    ]
 
-    checkpoint = ModelCheckpoint(
-        "src/models/anomaly_model.h5",
-        monitor="val_loss",
-        save_best_only=True
-    )
-
-
-    model.fit(
+    history = model.fit(
         X_train,
         X_train,
-        validation_data=(X_val,X_val),
-        epochs=20,
-        batch_size=256,
-        callbacks=[early_stop,checkpoint],
-        verbose=1
+        validation_data=(X_val, X_val),
+        epochs=EPOCHS,
+        batch_size=BATCH_SIZE,
+        callbacks=callbacks,
+        verbose=1,
     )
 
-    print("\nEvaluating anomaly model...")
+    model.save("src/models/anomaly_model.h5")
+    print("Saved model: src/models/anomaly_model.h5")
 
-    reconstructed = model.predict(X_val,batch_size=512)
+    reconstructed = model.predict(X_val, batch_size=256, verbose=1)
+    reconstruction_errors = np.mean(np.square(X_val - reconstructed), axis=(1, 2))
+    threshold = compute_threshold(reconstruction_errors)
 
-    errors = np.mean(np.square(X_val - reconstructed),axis=(1,2))
+    save_training_plots(history, reconstruction_errors, threshold)
+    print("Saved anomaly training plots")
 
-    threshold = np.percentile(errors,99)
-
-    print("Learned anomaly threshold:",threshold)
-
-
-    with open("src/models/anomaly_threshold.json","w") as f:
-        json.dump({"threshold":float(threshold)},f,indent=4)
-
-    print("Threshold saved")
-
-
-    X_val_flat = X_val.reshape(-1)
-    reconstructed_flat = reconstructed.reshape(-1)
-
-    mae = mean_absolute_error(X_val_flat,reconstructed_flat)
-    rmse = root_mean_squared_error(X_val_flat,reconstructed_flat)
-
-    print("MAE:",round(mae,3))
-    print("RMSE:",round(rmse,3))
-
-    os.makedirs("metrics",exist_ok=True)
-
-    metrics_data = {
-        "model":"cnn_anomaly_autoencoder",
-        "window_size":WINDOW_SIZE,
-        "mae":float(mae),
-        "rmse":float(rmse),
-        "threshold":float(threshold)
+    metrics = {
+        "model": "lstm_anomaly_autoencoder",
+        "window_size": WINDOW_SIZE,
+        "threshold": threshold,
+        "mean_error": float(reconstruction_errors.mean()),
+        "std_error": float(reconstruction_errors.std()),
+        "validation_samples": int(len(X_val)),
+        "max_samples_used": int(len(X)),
     }
 
-    with open("metrics/anomaly_metrics.json","w") as f:
-        json.dump(metrics_data,f,indent=4)
+    os.makedirs("metrics", exist_ok=True)
+    with open("metrics/anomaly_metrics.json", "w") as f:
+        json.dump(metrics, f, indent=4)
 
-    print("Metrics saved")
-
-    print("=== TRAIN_FAST_ANOMALY_MODEL COMPLETED ===")
+    print("Saved metrics: metrics/anomaly_metrics.json")
+    print("Threshold:", threshold)
+    print("=== TRAIN_ANOMALY_MODEL COMPLETED ===")
 
 
 if __name__ == "__main__":
