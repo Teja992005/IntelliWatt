@@ -2,7 +2,7 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Conv1D, Dense, Dropout, GlobalAveragePooling1D
 from tensorflow.keras.optimizers import Adam
 
-
+# seq to point cnn
 def build_nilm_cnn(window_size, output_length, base_filters=16):
 
     model = Sequential()

@@ -481,12 +481,17 @@ def build_line_chart(series, title, ylabel="Power (W)", highlight_index=None, co
     fig.patch.set_facecolor("#ffffff")
     ax.set_facecolor("#f2fafb")
 
-    ax.plot(series, color=color, linewidth=2, alpha=0.9)
-    if highlight_index is not None:
-        ax.axvline(x=highlight_index, color="#065f6e", linestyle="--", linewidth=1.4, alpha=0.65)
+    if len(series) == 1:
+        ax.bar(["Predicted Power"], series, color=color, width=0.3, alpha=0.9)
+        ax.text(0, series[0], f"{series[0]:.2f} W", ha='center', va='bottom', color="#033e4a", fontweight='bold', fontsize=10)
+        ax.set_ylim(0, max(series[0] * 1.15, 10))
+    else:
+        ax.plot(series, color=color, linewidth=2, alpha=0.9)
+        if highlight_index is not None:
+            ax.axvline(x=highlight_index, color="#065f6e", linestyle="--", linewidth=1.4, alpha=0.65)
 
     ax.set_title(title, fontsize=12, fontweight="bold", color="#033e4a", pad=10)
-    ax.set_xlabel("Time Index", color="#4a9aaa", fontsize=10)
+    ax.set_xlabel("Time Index" if len(series) > 1 else "", color="#4a9aaa", fontsize=10)
     ax.set_ylabel(ylabel, color="#4a9aaa", fontsize=10)
     ax.tick_params(colors="#5aa8b8", labelsize=9)
     ax.grid(alpha=0.12, color="#c8e8ee")
@@ -494,6 +499,7 @@ def build_line_chart(series, title, ylabel="Power (W)", highlight_index=None, co
         spine.set_color("#d0edf2")
     fig.tight_layout()
     return fig
+
 
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
@@ -1098,11 +1104,20 @@ with research_tab:
                             result = response.json()
                             prediction = result["prediction"]
 
-                            r1, r2 = st.columns(2, gap="small")
-                            with r1:
-                                metric_card("Model Type", result["model_type"])
-                            with r2:
-                                metric_card("Prediction Shape", str(result["prediction_shape"]))
+                            if len(prediction) == 1:
+                                r1, r2, r3 = st.columns(3, gap="small")
+                                with r1:
+                                    metric_card("Model Type", result["model_type"])
+                                with r2:
+                                    metric_card("Prediction Shape", str(result["prediction_shape"]))
+                                with r3:
+                                    metric_card("Predicted Power", f"{prediction[0]:.2f} W")
+                            else:
+                                r1, r2 = st.columns(2, gap="small")
+                                with r1:
+                                    metric_card("Model Type", result["model_type"])
+                                with r2:
+                                    metric_card("Prediction Shape", str(result["prediction_shape"]))
 
                             st.pyplot(
                                 build_line_chart(

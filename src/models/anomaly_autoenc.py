@@ -16,14 +16,14 @@ def build_autoencoder(window_size, latent_dim=64, dropout_rate=0.2):
 
     inputs = Input(shape=(window_size, 1), name="mains_window")
 
-    # ── Encoder ──
+    # Encoder
     x = Reshape((window_size,), name="flatten_input")(inputs)
     x = Dense(128, activation="relu", name="encoder_dense_1")(x)
     x = Dropout(dropout_rate, name="encoder_dropout_1")(x)
     x = Dense(latent_dim, activation="relu", name="encoder_dense_2")(x)
     x = Dropout(dropout_rate, name="encoder_dropout_2")(x)
 
-    # ── Decoder ──
+    # Decoder 
     x = Dense(128, activation="relu", name="decoder_dense_1")(x)
     x = Dropout(dropout_rate, name="decoder_dropout_1")(x)
     x = Dense(window_size, activation="linear", name="decoder_dense_2")(x)
