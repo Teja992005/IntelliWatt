@@ -1,178 +1,310 @@
-﻿# IntelliWatt
+# ⚡ IntelliWatt – AI-Powered Smart Energy Analytics System
 
-IntelliWatt is a smart energy analytics project built on the UK-DALE dataset. It combines appliance-level disaggregation, short-term load forecasting, anomaly detection, a FastAPI backend, and a Streamlit frontend in one Python codebase.
+A complete deep learning–based smart energy monitoring platform built on the **UK-DALE dataset**, integrating:
 
-## What It Includes
+- 🔌 NILM (Seq-to-Point CNN)
+- 🔌 NILM (Seq-to-Seq CNN)
+- 🔌 NILM (BiGRU – Bidirectional Gated Recurrent Unit)
+- 📈 LSTM Load Forecasting
+- 🚨 Hybrid Anomaly Detection (Dense Autoencoder + Safety Rule)
+- 💰 Monthly Bill Estimation
+- ⚙ FastAPI Backend
+- 📊 Streamlit Dashboard
 
-- NILM for appliance-level power estimation
-- Sequence-to-point CNN NILM
-- Sequence-to-sequence CNN NILM research variant
-- BiGRU-based NILM research variant
-- LSTM-based mains forecasting
-- Dense autoencoder-based anomaly detection
-- Rule-based severe anomaly escalation using a 3000W safety limit
-- FastAPI inference backend
-- Streamlit dashboard frontend
+---
 
-## System Flow
+## 🏗 System Architecture
 
-```text
+```mermaid
+flowchart TD
+
+    A[UK-DALE Dataset 6-sec Sampling]
+    B[Preprocessing Resampling Scaling Windowing]
+
+    C1[NILM Model Seq-to-Point CNN]
+    C2[Forecasting Model LSTM]
+    C3[Anomaly Model Dense Autoencoder]
+
+    D1[Appliance Level Power]
+    D2[Future Load Prediction]
+    D3[Reconstruction Error]
+
+    E[3000W Safety Rule]
+    F[Severity Engine]
+
+    G[Bill Estimation Rs6 per kWh]
+    H[FastAPI Backend]
+    I[Streamlit Dashboard]
+
+    A --> B
+    B --> C1
+    B --> C2
+    B --> C3
+
+    C1 --> D1
+    C2 --> D2
+    C3 --> D3
+
+    D3 --> F
+    E --> F
+
+    D2 --> G
+    G --> H
+    D1 --> H
+    F --> H
+
+    H --> I
+```
+
+---
+
+## 🔄 System Flow
+
+```
 UK-DALE data
-  -> preprocessing and alignment
-  -> task-specific training datasets
-  -> trained models and scalers
-  -> FastAPI endpoints
-  -> Streamlit dashboard
+  └─► Preprocessing & Alignment (resampling, scaling, windowing)
+        └─► Task-Specific Training Datasets
+              ├─► NILM (Seq-to-Point CNN / Seq-to-Seq CNN / BiGRU)
+              ├─► Load Forecasting (LSTM)
+              └─► Anomaly Detection (Dense Autoencoder)
+                    └─► Trained Models & Scalers
+                          └─► FastAPI Endpoints (/predict_nilm, /forecast, /detect_anomaly, /estimate_bill)
+                                └─► Streamlit Dashboard (interactive visualization & alerts)
 ```
 
-## Project Structure
+---
 
-```text
+## 📂 Project Structure
+
+```bash
 IntelliWatt/
-|-- backend/
-|   `-- app.py
-|-- frontend/
-|   `-- app.py
-|-- data/
-|   |-- processed/
-|   |-- samples/
-|   `-- ukdale/
-|-- metrics/
-|-- reports/
-|-- saved_models/
-|-- src/
-|   |-- anomaly/
-|   |-- evaluation/
-|   |-- models/
-|   |-- nilm_paper/
-|   |-- preprocessing/
-|   |-- training/
-|   `-- utils/
-|-- requirements.txt
-`-- README.md
+│
+├── data/
+│
+├── src/
+│   ├── preprocessing/
+│   ├── models/
+│   │   ├── nilm/
+│   │   ├── forecasting/
+│   │   └── anomaly/
+│   ├── training/
+│   └── evaluation/
+│
+├── backend/
+│   └── app.py
+│
+├── frontend/
+│   └── streamlit_app.py
+│
+├── saved_models/
+│
+└── requirements.txt
 ```
 
-## Core Modules
+---
 
-### NILM
+## 🔬 Core Models
 
-The NILM pipeline predicts appliance-level power from aggregate mains readings.
+### 🔌 1. NILM – Seq-to-Point CNN
 
-- Main appliances: `fridge`, `kettle`, `microwave`, `washing_machine`
-- Input window: `599`
-- Sampling rate: `6 seconds`
-- Main production-style architecture: CNN-based NILM
-- Research variants included: sequence-to-sequence CNN and BiGRU
-- Main training scripts live in `src/training`
+- Window size: **599**
+- Sampling rate: **6 seconds**
+- Center-point prediction — maps an input window of aggregate power to a **single point** (center value) of appliance power
+- Individual models:
+  - fridge
+  - kettle
+  - microwave
+  - washing_machine
 
-### Forecasting
+**Goal:** Disaggregate aggregate mains power into appliance-level consumption.
 
-The forecasting pipeline predicts the next mains power value from recent usage history.
+---
 
-- Model type: stacked LSTM
-- Input window: `60`
-- Output: next power step, estimated daily energy, estimated monthly bill
-- Training script: `src/training/train_forecast_mains.py`
+### 🔌 1b. NILM – Seq-to-Seq CNN
 
-### Anomaly Detection
+- Window size: **599**
+- Sampling rate: **6 seconds**
+- **Sequence-to-sequence mapping** — maps an entire input window of aggregate power to a **full output sequence** of appliance power of the same length
+- Uses 1D convolutional layers with appropriate padding to preserve temporal resolution
+- Produces denser supervision signals compared to Seq-to-Point, enabling the model to learn finer temporal patterns
+- Individual model:
+  - fridge
 
-The anomaly pipeline uses a dense autoencoder to reconstruct recent mains windows and flags unusual behavior from reconstruction error.
+**Goal:** Provide appliance-level disaggregation with full-sequence output for richer temporal detail.
 
-- Model type: fully connected autoencoder
-- Input window: `60`
-- Backend endpoint: `/anomaly/detect`
-- Severe rule override: power above `3000W`
-- Training script: `src/training/train_anomaly.py`
-- Model definition: `src/models/anomaly_autoenc.py`
+---
 
-## Generated Artifacts
+### 🔌 1c. NILM – BiGRU (Bidirectional GRU)
 
-Training updates the following key files.
+- Window size: **599**
+- Sampling rate: **6 seconds**
+- Uses **Bidirectional Gated Recurrent Units** to capture both past and future context in the aggregate signal
+- Processes the input sequence in both forward and backward directions, then merges the hidden states
+- Better suited for capturing long-range temporal dependencies compared to purely convolutional approaches
+- Individual model:
+  - fridge
 
-### Forecasting
+**Goal:** Leverage recurrent bi-directional context for more accurate appliance-level energy disaggregation.
 
-- `src/models/forecast_model.h5`
-- `src/models/forecast_scaler.pkl`
-- `metrics/forecast_metrics.json`
-- `reports/forecast_metrics.png`
+---
 
-### Anomaly Detection
+### 📈 2. Forecasting – LSTM
 
-- `src/models/anomaly_model.h5`
-- `src/models/anomaly_scaler.pkl`
-- `metrics/anomaly_metrics.json`
-- `reports/anomaly_loss_curve.png`
-- `reports/anomaly_error_distribution.png`
+- Window size: **60**
+- 6-second sampling
+- 1-step ahead prediction
 
-### NILM Research And Saved Models
+Used for:
+- Short-term load forecasting
+- Monthly bill estimation
 
-- `saved_models/seq2seq_6sec`
-- `saved_models/paper_versions`
+---
 
-The repo also includes NILM paper and experiment workflows for:
+### 🚨 3. Hybrid Anomaly Detection
 
-- sequence-to-sequence CNN
-- BiGRU
+#### Dense Autoencoder (Fully-Connected)
 
-## Setup
+- Trained on normal sequences
+- Uses reconstruction MSE
 
-Create and activate a virtual environment, then install dependencies.
+Threshold formula:
 
-```bash
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
+```python
+threshold = mean_error + 2 * std_error
 ```
 
-## Training
+Current metrics:
 
-Run training commands from the project root.
-
-### Train Forecast Model
-
-```bash
-.\venv\Scripts\python src\training\train_forecast_mains.py
+```json
+{
+    "threshold": 0.4723,
+    "mean_error": 0.0562,
+    "std_error": 0.2080
+}
 ```
 
-### Train Anomaly Model
+#### Safety Rule
 
-```bash
-.\venv\Scripts\python src\training\train_anomaly.py
+```python
+if total_power > 3000:
+    severity = "severe"
 ```
 
-### Train NILM Models
+#### Severity Logic
 
-```bash
-.\venv\Scripts\python src\training\train_nilm_fridge.py
-.\venv\Scripts\python src\training\train_nilm_kettle.py
-.\venv\Scripts\python src\training\train_nilm_microwave.py
-.\venv\Scripts\python src\training\train_nilm_washing_machine.py
+| Condition | Severity |
+|-----------|----------|
+| error < threshold | normal |
+| threshold < error < 2×threshold | mild |
+| error > 2×threshold | severe |
+| power > 3000W | severe |
+
+---
+
+## 💰 Monthly Bill Estimation
+
+Assumption: **₹6 per kWh**
+
+```python
+Energy (kWh) = sum(power * 6 seconds) / 3600
+Bill = Energy × 6
 ```
 
-## Run The App
+Uses forecasted load to estimate projected monthly cost.
 
-Start the backend:
+---
+
+## ⚙ Backend – FastAPI
+
+Handles:
+
+- Model loading  
+- Scaling  
+- Inference  
+- Hybrid anomaly logic  
+- Bill estimation  
+- JSON API responses  
+
+### Example Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `/predict_nilm` | Appliance disaggregation |
+| `/forecast` | Load prediction |
+| `/estimate_bill` | Monthly cost estimate |
+| `/detect_anomaly` | Hybrid anomaly detection |
+| `/metrics` | Model evaluation metrics |
+
+Run backend:
 
 ```bash
 uvicorn backend.app:app --reload
 ```
 
-Start the frontend in a separate terminal:
+---
+
+## 📊 Frontend – Streamlit Dashboard
+
+Features:
+
+- Real-time power graph  
+- Appliance-level breakdown  
+- Forecast visualization  
+- Monthly bill estimate  
+- Anomaly alerts (color-coded severity)  
+
+Run frontend:
 
 ```bash
-streamlit run frontend/app.py
+streamlit run frontend/streamlit_app.py
 ```
 
-## Main Backend Endpoints
+---
 
-- `GET /`
-- `POST /nilm/predict`
-- `POST /nilm/experiments/{model_type}`
-- `POST /forecast/predict`
-- `POST /anomaly/detect`
+## 🧠 AI Techniques Used
 
-## Notes
+- Convolutional Neural Networks (CNN) — Seq-to-Point & Seq-to-Seq
+- Bidirectional Gated Recurrent Units (BiGRU)
+- Long Short-Term Memory (LSTM)
+- Dense Autoencoder (Unsupervised)
+- Hybrid Rule-Based + Deep Learning Detection
 
-- The frontend was redesigned without changing backend contracts.
-- The backend loads anomaly settings from `metrics/anomaly_metrics.json`, so retraining the anomaly model updates runtime behavior after a backend restart.
-- If you retrain while the backend is already running, restart the backend so it loads the latest model and scaler files.
+---
+
+## 🚀 Key Features
+
+✔ Appliance-level energy disaggregation  
+✔ Short-term load forecasting  
+✔ Hybrid anomaly detection  
+✔ Monthly bill estimation  
+✔ Modular architecture  
+✔ Production-ready REST API  
+✔ Interactive dashboard  
+
+---
+
+## 📊 Dataset
+
+Trained on:
+
+**UK-DALE (UK Domestic Appliance-Level Electricity)**
+
+- 6-second resolution  
+- Real household appliance-level data  
+
+---
+
+## 🎯 Future Enhancements
+
+- Real-time IoT integration  
+- Dynamic tariff pricing  
+- Solar prediction integration  
+- Multi-home scalability  
+- Docker + Cloud deployment  
+- Edge-device inference  
+
+---
+
+## 🏆 Project Summary
+
+IntelliWatt is a hybrid deep-learning energy analytics platform that combines NILM-based appliance disaggregation, LSTM forecasting, autoencoder-based anomaly detection, and bill estimation into a production-ready FastAPI + Streamlit system trained on 6-second UK-DALE data.
